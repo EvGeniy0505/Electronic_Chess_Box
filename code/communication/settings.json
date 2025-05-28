@@ -1,0 +1,29 @@
+{
+    "theme": "dark",
+    "highlight_enabled": true,
+    "highlight_intensity": 60,
+    "light_color": [
+        240,
+        217,
+        181,
+        255
+    ],
+    "dark_color": [
+        181,
+        136,
+        99,
+        255
+    ],
+    "move_color": [
+        100,
+        200,
+        100,
+        60
+    ],
+    "opponent_move_color": [
+        200,
+        100,
+        100,
+        60
+    ]
+}
