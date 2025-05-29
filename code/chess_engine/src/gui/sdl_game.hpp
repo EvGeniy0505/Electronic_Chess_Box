@@ -11,6 +11,7 @@ class SDLGame {
   public:
     SDLGame(bool vsComputer = false, bool vsLichess = false,
             chess::Color computerColor = chess::Color::BLACK);
+    void handleArduinoMove(const std::string& move);
     ~SDLGame();
     void run();
 
@@ -41,7 +42,7 @@ class SDLGame {
     bool isNewGameButtonClicked(int x, int y);
     void renderPromotionDialog(int x, int y);
     chess::PieceType showPromotionDialog(chess::Color playerColor);
-
+      
     bool isPromoting;
     int promotionX, promotionY;
     std::array<chess::PieceType, 4> promotionOptions;

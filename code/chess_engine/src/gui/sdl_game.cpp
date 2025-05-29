@@ -558,12 +558,20 @@ void SDLGame::initializeFromFIFO() {
 }
 
 void SDLGame::processFIFOMove() {
-    if (fifo_in_fd == -1)
-        return;
+    if (fifo_in_fd == -1) return;
 
-    char buffer[10] = {0};
-    ssize_t bytes_read = read(fifo_in_fd, buffer, sizeof(buffer) - 1);
+    char buffer[32];
+    ssize_t bytes_read = read(fifo_in_fd, buffer, sizeof(buffer)-1);
+    
     if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+        std::string msg(buffer);
+        
+        if (msg.find("engine:") == 0) {
+            std::string move = msg.substr(7);
+            // Обработка хода с физической доски
+            handleArduinoMove(move);
+        }
         std::string input(buffer, bytes_read);
         // Ожидаем формат "lichess:e2e4\n"
         // if (input.find("lichess:") == 0) {
@@ -630,6 +638,29 @@ void SDLGame::processFIFOMove() {
             // << std::endl;
         }
         // }
+    }
+}
+
+void SDLGame::handleArduinoMove(const std::string& move) {
+    if (move.length() < 4) return;
+    
+    std::string from = move.substr(0, 2);
+    std::string to = move.substr(2, 2);
+    
+    // Преобразование в координаты
+    auto toCoords = [](const std::string& pos) -> std::pair<int,int> {
+        return {pos[0]-'a', 8-(pos[1]-'0')};
+    };
+    
+    auto [fromX, fromY] = toCoords(from);
+    auto [toX, toY] = toCoords(to);
+    
+    // Проверка и выполнение хода
+    if (board.make_move({fromX, fromY}, {toX, toY})) {
+        renderGame();
+        if (vsLichess) {
+            sendMoveToPython(move);
+        }
     }
 }
 
