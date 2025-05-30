@@ -6,9 +6,10 @@
 
 class Bluetooth {
 private:
-    SoftwareSerial btSerial;
     
 public:
+    SoftwareSerial btSerial;
+
     Bluetooth() : btSerial(BT_RX_PIN, BT_TX_PIN) {}
     
     void init() {
@@ -24,9 +25,14 @@ public:
     }
     
     void sendBoardState(byte* boardState) {
+        // Отправляем состояние доски одной строкой из 0 и 1
         for (byte row = 0; row < BOARD_SIZE; row++) {
-            btSerial.write(boardState[row]);
+            for (byte col = 0; col < BOARD_SIZE; col++) {
+                bool cellState = (boardState[col] & (1 << row)) != 0;
+                btSerial.print(cellState ? "1" : "0");
+            }
         }
+        btSerial.println(); // Переводим строку в конце
     }
 };
 

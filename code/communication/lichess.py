@@ -7,7 +7,7 @@ import berserk
 FIFO_PATH_IN = "./build/lichess_in"
 FIFO_PATH_OUT = "./build/lichess_out"
 
-TOKEN = "lip_iUfxOGzlWYRsU3nNLJyu"
+TOKEN = "lip_oJbvgEk60EQ65BEPWLlD"
 
 session = berserk.TokenSession(TOKEN)
 client = berserk.Client(session=session)

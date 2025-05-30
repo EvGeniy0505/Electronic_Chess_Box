@@ -21,7 +21,7 @@ auto toChessNotation = [](int x, int y) {
     return s;
 };
 
-void SDLGame::sendMoveToPython(const std::string &move) {
+void SDLGame::sendMoveToPython(const int fifo_out_fd, const std::string &move) {
     if (fifo_out_fd == -1)
         return;
 
@@ -111,55 +111,77 @@ bool SDLGame::playerMoveFromTerminal() {
     if (vsLichess) {
         std::string move =
             toChessNotation(fromX, fromY) + toChessNotation(toX, toY);
-        sendMoveToPython(move);
+        sendMoveToPython(fifo_lichess_out_fd, move);
     }
 
     return true;
 }
 
-SDLGame::SDLGame(bool vsComputer, bool vsLichess, chess::Color computerColor)
+SDLGame::SDLGame(bool vsComputer, bool vsLichess, bool withArduino, chess::Color computerColor)
     : window(nullptr), renderer(nullptr), font(nullptr), piecesTexture(nullptr),
       isRunning(true), isDragging(false), vsComputer(vsComputer),
-      vsLichess(vsLichess), dragStartX(-1), dragStartY(-1),
+      vsLichess(vsLichess), withArduino(withArduino), dragStartX(-1), dragStartY(-1),
       computer(chess::engine::ComputerPlayer::create(computerColor, 3)),
       board(), gameOver(false) {
     initSDL();
-    std::cerr << "Error: " << std::endl;
-
-    if (vsLichess)
-        initFIFO();
+    initFIFO();
 }
 
 void SDLGame::initFIFO() {
     // Создаем FIFO, если еще не существуют
-    // if (mkfifo(fifo_in_path.c_str(), 0666) == -1 && errno != EEXIST) {
+    // if (mkfifo(fifo_lichess_in_path.c_str(), 0666) == -1 && errno != EEXIST) {
     //     std::cerr << "Error creating input FIFO: " << strerror(errno)
     //               << std::endl;
     // }
-    // if (mkfifo(fifo_out_path.c_str(), 0666) == -1 && errno != EEXIST) {
+    // if (mkfifo(fifo_lichess_out_path.c_str(), 0666) == -1 && errno != EEXIST) {
     //     std::cerr << "Error creating output FIFO: " << strerror(errno)
     //               << std::endl;
     // }
 
-    // Открываем FIFO для чтения в неблокирующем режиме
-    fifo_in_fd = open(fifo_in_path.c_str(), O_RDONLY | O_NONBLOCK);
-    if (fifo_in_fd == -1) {
-        std::cerr << "Error opening input FIFO: " << strerror(errno)
-                  << std::endl;
+    if (vsLichess) {
+        // Открываем FIFO для чтения в неблокирующем режиме
+        fifo_lichess_in_fd = open(fifo_lichess_in_path.c_str(), O_RDONLY | O_NONBLOCK);
+        if (fifo_lichess_in_fd == -1) {
+            std::cerr << "Error opening input FIFO: " << strerror(errno)
+                    << std::endl;
+        }
+
+        // Открываем FIFO для записи в неблокирующем режиме
+        fifo_lichess_out_fd = open(fifo_lichess_out_path.c_str(), O_WRONLY | O_NONBLOCK);
+        if (fifo_lichess_out_fd == -1) {
+            std::cerr << "Error opening output FIFO: " << strerror(errno)
+                    << std::endl;
+        }
+
+        // Проверяем, что оба канала открыты успешно
+        if (fifo_lichess_in_fd != -1 && fifo_lichess_out_fd != -1) {
+            std::cout << "FIFO channels initialized successfully" << std::endl;
+        } else {
+            std::cerr << "Failed to initialize FIFO channels" << std::endl;
+        }
     }
 
-    // Открываем FIFO для записи в неблокирующем режиме
-    fifo_out_fd = open(fifo_out_path.c_str(), O_WRONLY | O_NONBLOCK);
-    if (fifo_out_fd == -1) {
-        std::cerr << "Error opening output FIFO: " << strerror(errno)
-                  << std::endl;
-    }
+    if (withArduino) {
+        // Открываем FIFO для чтения в неблокирующем режиме
+        fifo_arduino_in_fd = open(fifo_arduino_in_path.c_str(), O_RDONLY | O_NONBLOCK);
+        if (fifo_arduino_in_fd == -1) {
+            std::cerr << "Error opening input arduino FIFO: " << strerror(errno)
+                    << std::endl;
+        }
 
-    // Проверяем, что оба канала открыты успешно
-    if (fifo_in_fd != -1 && fifo_out_fd != -1) {
-        std::cout << "FIFO channels initialized successfully" << std::endl;
-    } else {
-        std::cerr << "Failed to initialize FIFO channels" << std::endl;
+        // Открываем FIFO для записи в неблокирующем режиме
+        fifo_arduino_out_fd = open(fifo_arduino_out_path.c_str(), O_WRONLY | O_NONBLOCK);
+        if (fifo_arduino_out_fd == -1) {
+            std::cerr << "Error opening output arduino FIFO: " << strerror(errno)
+                    << std::endl;
+        }
+
+        // Проверяем, что оба канала открыты успешно
+        if (fifo_arduino_in_fd != -1 && fifo_arduino_out_fd != -1) {
+            std::cout << "FIFO arduino channels initialized successfully" << std::endl;
+        } else {
+            std::cerr << "Failed arduino to initialize FIFO channels" << std::endl;
+        }
     }
 }
 
@@ -470,7 +492,7 @@ void SDLGame::handleMouseUp(const SDL_Event &event) {
         if (vsLichess) {
             std::string move = toChessNotation(dragStartX, dragStartY) +
                                toChessNotation(targetX, targetY);
-            sendMoveToPython(move);
+            sendMoveToPython(fifo_arduino_out_fd, move);
         }
 
         possibleMoves.clear();
@@ -482,13 +504,13 @@ void SDLGame::handleMouseUp(const SDL_Event &event) {
     }
 }
 
-void SDLGame::makeComputerMove() {
+std::string SDLGame::makeComputerMove() {
     if (computer->makeMove(board)) {
         auto lastMove = computer->getLastMove(); // Нужно реализовать, если нет
+        std::string move = toChessNotation(lastMove.from.first, lastMove.from.second) +
+                         toChessNotation(lastMove.to.first, lastMove.to.second);
         std::cout << "Компьютер ходит: " 
-                  << toChessNotation(lastMove.from.first, lastMove.from.second)
-                  << " -> "
-                  << toChessNotation(lastMove.to.first, lastMove.to.second)
+                  << move
                   << std::endl;
 
         if (board.is_checkmate(computer->color_ == chess::Color::WHITE
@@ -497,10 +519,11 @@ void SDLGame::makeComputerMove() {
             std::cout << "Checkmate! Computer wins!" << std::endl;
         }
     }
+    return "";
 }
 
 void SDLGame::initializeFromFIFO() {
-    if (fifo_in_fd == -1) {
+    if (fifo_lichess_in_fd == -1) {
         std::cerr << "FIFO не инициализирован" << std::endl;
         chess::BoardInitializer::setup_initial_position(
             board, chess::BoardInitializer::STANDARD_FEN);
@@ -512,7 +535,7 @@ void SDLGame::initializeFromFIFO() {
     ssize_t bytes_read;
 
     // Блокирующее чтение первого байта (ждем любые данные)
-    bytes_read = read(fifo_in_fd, buffer, 1);
+    bytes_read = read(fifo_lichess_in_fd, buffer, 1);
     if (bytes_read <= 0) {
         std::cerr << "Ошибка чтения из FIFO: " << strerror(errno) << std::endl;
         chess::BoardInitializer::setup_initial_position(
@@ -524,11 +547,11 @@ void SDLGame::initializeFromFIFO() {
     initial_data.push_back(buffer[0]);
 
     // Устанавливаем неблокирующий режим для оставшихся данных
-    int flags = fcntl(fifo_in_fd, F_GETFL, 0);
-    fcntl(fifo_in_fd, F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(fifo_lichess_in_fd, F_GETFL, 0);
+    fcntl(fifo_lichess_in_fd, F_SETFL, flags | O_NONBLOCK);
 
     // Читаем остальные данные (если есть)
-    while ((bytes_read = read(fifo_in_fd, buffer, sizeof(buffer) - 1)) > 0) {
+    while ((bytes_read = read(fifo_lichess_in_fd, buffer, sizeof(buffer) - 1)) > 0) {
         buffer[bytes_read] = '\0';
         initial_data.append(buffer);
 
@@ -537,7 +560,7 @@ void SDLGame::initializeFromFIFO() {
     }
 
     // Восстанавливаем блокирующий режим
-    fcntl(fifo_in_fd, F_SETFL, flags);
+    fcntl(fifo_lichess_in_fd, F_SETFL, flags);
 
     // Удаляем завершающий перевод строки если есть
     if (!initial_data.empty() && initial_data.back() == '\n')
@@ -557,21 +580,13 @@ void SDLGame::initializeFromFIFO() {
     }
 }
 
-void SDLGame::processFIFOMove() {
-    if (fifo_in_fd == -1) return;
+std::string SDLGame::processFIFOMove(const int fifo_in_fd) {
+    if (fifo_in_fd == -1)
+        return "";
 
-    char buffer[32];
-    ssize_t bytes_read = read(fifo_in_fd, buffer, sizeof(buffer)-1);
-    
+    char buffer[10] = {0};
+    ssize_t bytes_read = read(fifo_in_fd, buffer, sizeof(buffer) - 1);
     if (bytes_read > 0) {
-        buffer[bytes_read] = '\0';
-        std::string msg(buffer);
-        
-        if (msg.find("engine:") == 0) {
-            std::string move = msg.substr(7);
-            // Обработка хода с физической доски
-            handleArduinoMove(move);
-        }
         std::string input(buffer, bytes_read);
         // Ожидаем формат "lichess:e2e4\n"
         // if (input.find("lichess:") == 0) {
@@ -599,13 +614,13 @@ void SDLGame::processFIFOMove() {
 
             if (fromX < 0 || fromX > 7 || toX < 0 || toX > 7 || fromY < 0 ||
                 fromY > 7 || toY < 0 || toY > 7)
-                return;
+                return "";
 
             // std::cout << "Move from FIFO3: " << std::endl;
             const auto &piece = board.get_piece({fromX, fromY});
             if (piece.get_type() == chess::PieceType::NONE ||
                 piece.get_color() != board.current_player)
-                return;
+                return "";
 
             // std::cout << "Move from FIFO3: " << std::endl;
             auto legalMoves = board.get_legal_moves({fromX, fromY});
@@ -618,7 +633,7 @@ void SDLGame::processFIFOMove() {
             }
             // std::cout << "Move from FIFO4: " << std::endl;
             if (!moveIsLegal)
-                return;
+                return "";
 
             // std::cout << "Move from FIFO5: " << std::endl;
             bool isPromotionMove =
@@ -634,34 +649,14 @@ void SDLGame::processFIFOMove() {
                 board.make_move({fromX, fromY}, {toX, toY});
             }
 
+            return move;
+
             // std::cout << "Move from FIFO: " << from << " -> " << to
             // << std::endl;
         }
         // }
     }
-}
-
-void SDLGame::handleArduinoMove(const std::string& move) {
-    if (move.length() < 4) return;
-    
-    std::string from = move.substr(0, 2);
-    std::string to = move.substr(2, 2);
-    
-    // Преобразование в координаты
-    auto toCoords = [](const std::string& pos) -> std::pair<int,int> {
-        return {pos[0]-'a', 8-(pos[1]-'0')};
-    };
-    
-    auto [fromX, fromY] = toCoords(from);
-    auto [toX, toY] = toCoords(to);
-    
-    // Проверка и выполнение хода
-    if (board.make_move({fromX, fromY}, {toX, toY})) {
-        renderGame();
-        if (vsLichess) {
-            sendMoveToPython(move);
-        }
-    }
+    return "";
 }
 
 void SDLGame::run() {
@@ -673,17 +668,22 @@ void SDLGame::run() {
 
     while (isRunning) {
         handleEvents();
+        std::string move = processFIFOMove(fifo_arduino_in_fd);
         renderGame();
 
-        // std::cout << (board.current_player == chess::Color::WHITE) <<
-        // std::endl;
         if (!gameOver) {
             if (vsLichess && board.current_player != computer->color_) {
-                processFIFOMove();
+                std::string move = processFIFOMove(fifo_lichess_in_fd);
+                sendMoveToPython(fifo_lichess_out_fd, move);
+                sendMoveToPython(fifo_arduino_out_fd, move);
 
             } else if (vsComputer && board.current_player == computer->color_ &&
                        !isDragging) {
                 makeComputerMove();
+                sendMoveToPython(fifo_arduino_out_fd, move);
+            }
+            else {
+                processFIFOMove(fifo_arduino_in_fd);
             }
 
             // Проверка окончания игры
@@ -729,13 +729,21 @@ void SDLGame::cleanup() {
     TTF_Quit();
     SDL_Quit();
 
-    if (fifo_in_fd != -1) {
-        close(fifo_in_fd);
-        fifo_in_fd = -1;
+    if (fifo_lichess_in_fd != -1) {
+        close(fifo_lichess_in_fd);
+        fifo_lichess_in_fd = -1;
     }
-    if (fifo_out_fd != -1) {
-        close(fifo_out_fd);
-        fifo_out_fd = -1;
+    if (fifo_lichess_out_fd != -1) {
+        close(fifo_lichess_out_fd);
+        fifo_lichess_out_fd = -1;
+    }
+    if (fifo_arduino_in_fd != -1) {
+        close(fifo_arduino_in_fd);
+        fifo_arduino_in_fd = -1;
+    }
+    if (fifo_arduino_out_fd != -1) {
+        close(fifo_arduino_out_fd);
+        fifo_arduino_out_fd = -1;
     }
 }
 

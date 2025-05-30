@@ -19,12 +19,12 @@ public:
     
     // Сканирует всю матрицу и возвращает массив состояний
     void scan() {
-        for (byte row = 0; row < BOARD_SIZE; row++) {
-            // Активируем текущую строку
-            shiftRegisters.setOutput(1 << row);
+        for (byte col = 0; col < BOARD_SIZE; col++) {
+            // Активируем текущий столбец
+            shiftRegisters.setOutput(1 << col);
             
-            // Читаем состояние столбцов
-            boardState[row] = shiftRegisters.readInput();
+            // Читаем состояние строк
+            boardState[col] = shiftRegisters.readInput();
             
             // Небольшая задержка для стабилизации
             delayMicroseconds(50);
@@ -34,7 +34,7 @@ public:
     // Проверяет состояние конкретной клетки
     bool isCellActive(byte row, byte col) {
         if (row >= BOARD_SIZE || col >= BOARD_SIZE) return false;
-        return (boardState[row] & (1 << col)) != 0;
+        return (boardState[col] & (1 << row)) != 0;
     }
     
     // Возвращает указатель на массив состояний

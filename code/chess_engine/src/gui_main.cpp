@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     }
 
     try {
-        SDLGame game(vsComputer, vsLichess, computerColor);
+        SDLGame game(vsComputer, vsLichess, true, computerColor);
 
         game.run();
     } catch (const std::exception &e) {

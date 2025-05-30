@@ -9,22 +9,26 @@
 
 class SDLGame {
   public:
-    SDLGame(bool vsComputer = false, bool vsLichess = false,
+    SDLGame(bool vsComputer = false, bool vsLichess = false, bool withArduino = false,
             chess::Color computerColor = chess::Color::BLACK);
-    void handleArduinoMove(const std::string& move);
     ~SDLGame();
     void run();
 
   private:
-    int fifo_in_fd = -1;  // для чтения ходов от Python
-    int fifo_out_fd = -1; // для записи ходов в Python
-    const std::string fifo_in_path = "./build/lichess_in";
-    const std::string fifo_out_path = "./build/lichess_out";
+    int fifo_lichess_in_fd = -1;  // для чтения ходов от Python
+    int fifo_lichess_out_fd = -1; // для записи ходов в Python
+    const std::string fifo_lichess_in_path = "./build/lichess_in";
+    const std::string fifo_lichess_out_path = "./build/lichess_out";
+    int fifo_arduino_in_fd = -1;  // для чтения ходов от Python
+    int fifo_arduino_out_fd = -1;  // для чтения ходов от Python
+    const std::string fifo_arduino_in_path = "./build/arduino_in";
+    const std::string fifo_arduino_out_path = "./build/arduino_out";
+
     void initFIFO();
-    void sendMoveToPython(const std::string &move);
+    void sendMoveToPython(const int fifo_in_fd, const std::string &move);
 
     void renderGame();
-    void processFIFOMove();
+    std::string processFIFOMove(const int fifo_in_fd);
     void initializeFromFIFO();
     bool playerMoveFromTerminal();
     void initSDL();
@@ -35,14 +39,14 @@ class SDLGame {
     void handleMouseDown(const SDL_Event &event);
     void handleMouseMotion(const SDL_Event &event);
     void handleMouseUp(const SDL_Event &event);
-    void makeComputerMove();
+    std::string makeComputerMove();
     void cleanup();
     void renderGameOverMessage();
     void renderNewGameButton();
     bool isNewGameButtonClicked(int x, int y);
     void renderPromotionDialog(int x, int y);
     chess::PieceType showPromotionDialog(chess::Color playerColor);
-      
+
     bool isPromoting;
     int promotionX, promotionY;
     std::array<chess::PieceType, 4> promotionOptions;
@@ -57,6 +61,7 @@ class SDLGame {
     std::unique_ptr<chess::engine::ComputerPlayer> computer;
     bool isRunning;
     bool isDragging;
+    bool withArduino;
     bool vsComputer;
     bool vsLichess;
     int dragStartX, dragStartY;

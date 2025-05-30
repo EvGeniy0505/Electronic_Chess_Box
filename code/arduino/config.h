@@ -1,25 +1,27 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// Конфигурация пинов
-#define DATA_PIN_OUT  2    // Пин данных для выходного регистра
-#define CLOCK_PIN_OUT 3    // Пин такта для выходного регистра
-#define LATCH_PIN_OUT 4    // Пин защелки для выходного регистра
+// Пины 74HC595 (выходные - столбцы)
+#define LATCH_PIN_OUT 6     // CS_595 (Latch)
+#define DATA_PIN_OUT 5       // DAT_595
+#define CLOCK_PIN_OUT 7      // CLK_595
 
-#define DATA_PIN_IN   5    // Пин данных для входного регистра
-#define CLOCK_PIN_IN  6    // Пин такта для входного регистра
-#define LATCH_PIN_IN  7    // Пин защелки для входного регистра
+// Пины 74HC165 (входные - строки)
+#define LATCH_PIN_IN 3       // LAT_165 (Load)
+#define DATA_PIN_IN 4        // DAT_165
+#define CLOCK_PIN_IN 2       // CLK_165
 
-#define LED_PIN       8    // Пин управления светодиодной лентой
-#define BT_TX_PIN     9    // Пин TX Bluetooth
-#define BT_RX_PIN     10   // Пин RX Bluetooth
+// Bluetooth пины
+#define BT_TX_PIN 8          // Пин TX Bluetooth
+#define BT_RX_PIN 9         // Пин RX Bluetooth
 
 // Константы
-#define BOARD_SIZE 8       // Размер шахматной доски (8x8)
-#define LED_COUNT 64       // Количество светодиодов в ленте
+#define BOARD_SIZE 8         // Размер шахматной доски (8x8)
 
-// Цвета светодиодов
-#define LED_ON_COLOR 0x00FF00  // Зелёный (формат GRB)
-#define LED_OFF_COLOR 0x000000 // Выключен
+// LED Configuration
+#define LED_PIN 11           // Пин, к которому подключена лента
+#define LED_COUNT 64        // 8x8 = 64 светодиода
+#define LED_ON_COLOR strip.Color(0, 255, 0)  // Зеленый цвет для занятых клеток
+#define LED_OFF_COLOR strip.Color(0, 0, 0)   // Выключенный светодиод
 
 #endif
